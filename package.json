@@ -1,0 +1,9 @@
+{
+  "name": "ticket-booking-project",
+  "version": "1.0.0",
+  "description": "CinePass Ticket Booking - 1-Command Startup",
+  "scripts": {
+    "start": "node start.js",
+    "dev": "node start.js"
+  }
+}
