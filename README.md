@@ -41,10 +41,10 @@ ticket-booking-project/
 │   │   ├── App.jsx                   # Single-page Cinema application: Movie selector, Seat Matrix, Snacks & Modal
 │   │   ├── index.css                 # Cinema theme styles, glowing auditorium screen, seat status classes
 │   │   └── main.jsx                  # React DOM entrypoint
-│   ├── index.html                    # HTML5 shell with cinema typography
+│   ├── index.html                    # HTML5 shell with Bootstrap 5.3 & cinema styling
 │   ├── package.json
-│   └── vite.config.js                # Vite development server with /api proxy to port 5000
-├── package.json                      # Workspace root scripts (dev, install:all)
+│   └── vite.config.js                # Vite development server (port 3006) with /api proxy to port 4006
+├── package.json                      # Root scripts (npm start / npm run dev)
 ├── run.bat                           # 1-Click Windows execution script
 ├── start.js                          # Node cross-platform concurrency launcher
 └── README.md
@@ -182,18 +182,20 @@ Double-click `run.bat` in the project root directory. It runs setup and launches
    cd ticket-booking-project
    ```
 
-2. **Install all dependencies**:
+2. **Install dependencies**:
    ```bash
-   npm run install:all
+   cd backend && npm install
+   cd ../frontend && npm install
+   cd ..
    ```
 
 3. **Start both backend and frontend concurrently**:
    ```bash
-   npm run dev
+   npm start
    ```
 
-- **Frontend Application**: `http://localhost:5173`
-- **Backend REST API**: `http://localhost:5000`
+- **Frontend Application**: `http://localhost:3006`
+- **Backend REST API**: `http://localhost:4006`
 
 ---
 
