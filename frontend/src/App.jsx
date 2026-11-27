@@ -712,7 +712,7 @@ export default function App() {
       </main>
 
       <footer className="text-center py-3 text-secondary small border-top border-secondary border-opacity-25 bg-black mt-auto">
-        CinePass Premier &bull; Full-Stack Cinema Ticket Booking Platform with Atomic SQLite Concurrency Protection
+        CinePass Premier &bull; Full-Stack MERN Cinema Booking Platform with Atomic MongoDB Atlas Concurrency Protection
       </footer>
     </div>
   );
