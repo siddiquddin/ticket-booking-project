@@ -1,24 +1,24 @@
-# CinePass — Full-Stack Cinema Ticket Booking Platform with Atomic Concurrency Control
+# CinePass — Full-Stack Cinema Ticket Booking Platform with Atomic Concurrency Control (MERN Stack)
 
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org)
 [![Express](https://img.shields.io/badge/Express-4.x-black.svg)](https://expressjs.com)
+[![MongoDB](https://img.shields.io/badge/Database-MongoDB%20Atlas%20%2B%20Mongoose-brightgreen.svg)](https://www.mongodb.com)
 [![React](https://img.shields.io/badge/React-18-blue.svg)](https://react.dev)
 [![Vite](https://img.shields.io/badge/Vite-5.x-purple.svg)](https://vitejs.dev)
-[![SQLite3](https://img.shields.io/badge/SQLite-ACID%20Transactions-lightblue.svg)](https://www.sqlite.org)
 [![Concurrency](https://img.shields.io/badge/Concurrency-Atomic%20Locking%20(409)-crimson.svg)](#-atomic-concurrency-control--double-booking-prevention)
 
-A full-stack movie theater reservation system built with React 18, Express, and SQLite3. Engineered to solve one of the most critical challenges in high-traffic ticketing systems: **atomic double-booking prevention** when concurrent users attempt to reserve the same seat simultaneously.
+A production-ready **MERN stack** (MongoDB Atlas, Express, React 18, Node.js) cinema and event reservation platform. Engineered to solve one of the most critical challenges in high-traffic ticketing systems: **atomic double-booking prevention** when concurrent users attempt to reserve the same seat simultaneously.
 
 ---
 
 ## 🌟 Key Features
 
 - **Interactive IMAX Seating Matrix**: 40-seat interactive cinema auditorium grid color-coded by tiers (Standard $12.00, Premium $16.00, VIP Recliner $22.00) with live selection badges and dynamic pricing recalculation.
-- **Atomic Concurrency Control (Double-Booking Prevention)**: Backend transactions wrapped in SQLite `BEGIN TRANSACTION` ... `COMMIT` / `ROLLBACK`. If another user reserves a seat milliseconds before you, the transaction aborts and returns an HTTP `409 Conflict` error without partial writes.
-- **Race Condition Simulator**: Dedicated one-click button in the UI (`Simulate Race Condition`) allowing interviewers to trigger simultaneous synthetic booking attempts and observe transaction rollbacks and conflict rejection in real time.
+- **Atomic Concurrency Control (Double-Booking Prevention)**: Backend atomic reservation powered by MongoDB conditional updates (`status: 'AVAILABLE'`). If another user reserves a seat milliseconds before you, the conditional update detects the conflict, rolls back partial locks, and returns an HTTP `409 Conflict` error without corrupted state.
+- **Race Condition Simulator**: Dedicated one-click button in the UI (`Simulate Race Condition`) allowing recruiters and interviewers to trigger simultaneous synthetic booking attempts and observe conflict rejection in real time.
 - **Concessions & Gourmet Snack Add-Ons**: Integrated cinema snack bar (Popcorn Combos, Truffle Nachos, Artisan Sweets, Slushies) with live cart calculation and itemized receipts.
-- **Digital Boarding Pass & QR Receipts**: Instant booking confirmation with reference codes (`CP-XXXXX`), customer email routing, and one-click booking cancellation with seat liberation.
-- **Atmospheric Dark-Mode Cinema UI**: Immersive movie banner backdrops, glowing curved theater screen, responsive mobile drawer, and sound/visual feedback on reservation.
+- **Digital Boarding Pass & QR Receipts**: Instant booking confirmation with reference codes (`CP-XXXXX`), customer email routing, and one-click booking cancellation with immediate seat liberation.
+- **Atmospheric Dark-Mode Cinema UI**: Immersive movie banner backdrops, glowing curved theater screen, responsive mobile drawer, and visual feedback on reservation.
 
 ---
 
@@ -28,14 +28,20 @@ A full-stack movie theater reservation system built with React 18, Express, and 
 ticket-booking-project/
 ├── backend/
 │   ├── config/
-│   │   ├── db.js                     # SQLite schema initialization (Movies, Showtimes, Seats, Bookings, Concessions)
-│   │   └── ticket_booking.db         # Persistent SQLite database with foreign keys enabled
+│   │   └── db.js                     # MongoDB connection & auto-seeding (Movies, Showtimes, 40 Seats, Concessions)
+│   ├── models/
+│   │   ├── Movie.js                  # Mongoose schema for cinema films
+│   │   ├── Showtime.js               # Mongoose schema for auditorium show schedules
+│   │   ├── Seat.js                   # Mongoose schema for tiered seats with compound unique index
+│   │   ├── Booking.js                # Mongoose schema for customer booking passes
+│   │   └── Concession.js             # Mongoose schema for cinema snacks catalog
 │   ├── controllers/
-│   │   └── ticketController.js       # Atomic booking transaction engine, pricing logic & race condition simulator
+│   │   └── ticketController.js       # Atomic booking engine, server-side pricing & race condition simulator
 │   ├── routes/
 │   │   └── api.js                    # REST API endpoints for movies, seats, concessions & bookings
+│   ├── .env.example                  # Template with MONGODB_URI
 │   ├── package.json
-│   └── server.js                     # Express server, CORS & JSON body-parser configuration
+│   └── server.js                     # Express server listening on port 4006
 ├── frontend/
 │   ├── src/
 │   │   ├── App.jsx                   # Single-page Cinema application: Movie selector, Seat Matrix, Snacks & Modal
@@ -44,9 +50,10 @@ ticket-booking-project/
 │   ├── index.html                    # HTML5 shell with Bootstrap 5.3 & cinema styling
 │   ├── package.json
 │   └── vite.config.js                # Vite development server (port 3006) with /api proxy to port 4006
-├── package.json                      # Root scripts (npm start / npm run dev)
+├── package.json                      # Root workspace scripts (npm start / npm run dev)
 ├── run.bat                           # 1-Click Windows execution script
-├── start.js                          # Node cross-platform concurrency launcher
+├── start.js                          # Cross-platform concurrency launcher
+├── .env.example
 └── README.md
 ```
 
@@ -56,90 +63,93 @@ ticket-booking-project/
 
 In high-concurrency ticket booking, naive implementations read seat status and update it in separate operations. If User A and User B both view Seat `C4` as `AVAILABLE` and click "Book" simultaneously, both payments would be processed and the seat would be double-booked.
 
-### How CinePass Solves This:
+### How CinePass Solves This with MongoDB:
 ```text
-Client Request: POST /api/bookings { showtimeId: 1, seats: ['C4', 'C5'] }
+Client Request: POST /api/bookings { showtimeId, seats: ['C4', 'C5'] }
                       │
                       ▼
-             db.run('BEGIN TRANSACTION')
+        [Step 1: Verify No Seats Currently BOOKED]
+        Seat.find({ showtime, seatLabel: { $in: ['C4', 'C5'] }, status: 'BOOKED' })
                       │
-                      ▼
-       [Step 1: Check Seat Status with Row Lock]
-       SELECT seat_label, tier, price FROM seats 
-       WHERE showtime_id = ? AND seat_label IN ('C4', 'C5') AND status = 'BOOKED';
-                      │
-        ┌─────────────┴─────────────┐
-        │                           │
-  [Any seat is BOOKED]      [All seats AVAILABLE]
-        │                           │
-        ▼                           ▼
-db.run('ROLLBACK')          [Step 2: Calculate Exact DB Total]
-        │                   [Step 3: UPDATE seats SET status = 'BOOKED']
-        ▼                   [Step 4: INSERT INTO bookings]
-Return HTTP 409 Conflict            │
-("Seat C4 was already booked")      ▼
-                            db.run('COMMIT')
-                                    │
-                                    ▼
-                            Return HTTP 201 Created
-                            (Issue Digital Pass CP-48291)
+         ┌────────────┴────────────┐
+         │                         │
+   [Any seat BOOKED]        [All seats AVAILABLE]
+         │                         │
+         ▼                         ▼
+Return HTTP 409 Conflict    [Step 2: Atomic Conditional Lock]
+("Double-booking prevented") Seat.updateMany(
+                               { showtime, seatLabel: { $in: seats }, status: 'AVAILABLE' },
+                               { $set: { status: 'BOOKED' } }
+                             )
+                                   │
+                    ┌──────────────┴──────────────┐
+                    │                             │
+       [modifiedCount !== seats.length]  [All seats locked]
+                    │                             │
+                    ▼                             ▼
+       Rollback partial locks &          [Step 3: Server-side Pricing Verification]
+       Return HTTP 409 Conflict          [Step 4: Booking.create()]
+                                                  │
+                                                  ▼
+                                         Return HTTP 201 Created
+                                         (Issue Digital Pass CP-48291)
 ```
 
 ---
 
-## 🗄️ Database Schema & Relationships
+## 🗄️ MongoDB Document Models (Mongoose)
 
 ```mermaid
 erDiagram
-    MOVIES ||--o{ SHOWTIMES : schedules
-    SHOWTIMES ||--o{ SEATS : configures
-    SHOWTIMES ||--o{ BOOKINGS : confirms
+    MOVIES ||--o{ SHOWTIMES : "schedules"
+    SHOWTIMES ||--o{ SEATS : "configures"
+    SHOWTIMES ||--o{ BOOKINGS : "confirms"
     
     MOVIES {
-        int id PK
+        ObjectId _id PK
         string title
         string genre
         string duration
         float rating
-        string poster_url
-        string backdrop_url
+        string posterUrl
+        string backdropUrl
         string description
     }
 
     SHOWTIMES {
-        int id PK
-        int movie_id FK
-        string screen_name
-        string show_time
-        float ticket_price
+        ObjectId _id PK
+        ObjectId movie FK
+        string screenName
+        string showTime
+        float ticketPrice
     }
 
     SEATS {
-        int id PK
-        int showtime_id FK
-        string seat_row
-        int seat_number
-        string seat_label
+        ObjectId _id PK
+        ObjectId showtime FK
+        string seatRow
+        int seatNumber
+        string seatLabel
         string tier
         float price
         string status
     }
 
     BOOKINGS {
-        int id PK
-        string booking_ref UK
-        int showtime_id FK
-        string customer_name
-        string customer_email
-        string seat_labels
-        string snacks_summary
-        float total_amount
+        ObjectId _id PK
+        string bookingRef UK
+        ObjectId showtime FK
+        string customerName
+        string customerEmail
+        array seatLabels
+        string snacksSummary
+        float totalAmount
         string status
-        datetime created_at
+        datetime createdAt
     }
 
     CONCESSIONS {
-        int id PK
+        ObjectId _id PK
         string name
         string category
         float price
@@ -158,10 +168,11 @@ erDiagram
 | `GET` | `/api/movies/:movieId/showtimes` | *(None)* | Fetches showtimes and screens for specified movie |
 | `GET` | `/api/showtimes/:showtimeId/seats` | *(None)* | Retrieves 40-seat matrix with tier, price, and booking status |
 | `GET` | `/api/concessions` | *(None)* | Retrieves theater snacks, combos, and beverages |
-| `POST` | `/api/bookings` | `{ showtimeId, customerName, customerEmail, selectedSeats, selectedSnacks }` | **Atomic booking transaction**; returns `201 Created` or `409 Conflict` |
-| `DELETE` | `/api/bookings/:bookingRef` | *(None)* | Cancels booking and instantly unlocks reserved seats |
+| `POST` | `/api/bookings` | `{ showtimeId, customerName, customerEmail, selectedSeats, selectedSnacks }` | **Atomic booking reservation**; returns `201 Created` or `409 Conflict` |
+| `DELETE` | `/api/bookings/:bookingRef` | *(None)* | Cancels booking and instantly unlocks reserved seats to `AVAILABLE` |
 | `POST` | `/api/bookings/simulate-collision` | `{ showtimeId, seatLabel }` | Simulates a race condition collision on a targeted seat |
 | `GET` | `/api/bookings/recent` | *(None)* | Retrieves the latest confirmed reservations |
+| `GET` | `/api/health` | *(None)* | Health check returning MongoDB Atlas connection status |
 
 ---
 
@@ -170,6 +181,7 @@ erDiagram
 ### Prerequisites
 - Node.js (v18.0.0 or higher)
 - npm (v9.0.0 or higher)
+- MongoDB (Local MongoDB instance or free MongoDB Atlas cloud cluster)
 
 ### Option 1: One-Click Launch (Windows)
 Double-click `run.bat` in the project root directory. It runs setup and launches both backend and frontend automatically.
@@ -182,14 +194,20 @@ Double-click `run.bat` in the project root directory. It runs setup and launches
    cd ticket-booking-project
    ```
 
-2. **Install dependencies**:
+2. **Configure Environment Variables**:
+   ```bash
+   cp backend/.env.example backend/.env
+   # Default connects to mongodb://127.0.0.1:27017/ticket_booking
+   ```
+
+3. **Install dependencies**:
    ```bash
    cd backend && npm install
    cd ../frontend && npm install
    cd ..
    ```
 
-3. **Start both backend and frontend concurrently**:
+4. **Start both backend and frontend concurrently**:
    ```bash
    npm start
    ```
@@ -204,11 +222,11 @@ Double-click `run.bat` in the project root directory. It runs setup and launches
 When presenting this project in technical interviews:
 
 1. **Handling Distributed Concurrency & Race Conditions**:
-   *"In ticketing applications, the biggest architectural hazard is double-booking. I solved this by wrapping seat verification and status updates inside ACID database transactions (`BEGIN TRANSACTION`). If another thread or client books any requested seat, the entire operation is rolled back and an HTTP 409 Conflict error is returned."*
+   *"In ticketing applications, the biggest architectural hazard is double-booking. I solved this by leveraging atomic conditional updates in MongoDB (`status: 'AVAILABLE'`). If another client attempts to reserve any seat concurrently, the write detects the state discrepancy, rolls back partial changes, and immediately returns an HTTP 409 Conflict error."*
 2. **Server-Side Price Validation**:
    *"Client-side prices can easily be tampered with in browser DevTools. Instead of trusting prices submitted from the frontend, the backend queries the database for each selected seat's tier price and calculates the definitive order total server-side."*
-3. **Optimistic vs. Pessimistic Locking**:
-   *"I can explain the tradeoffs between pessimistic locking (database transactions holding exclusive locks during writes) and optimistic locking (version numbers on seat records). For this project, transaction serialization guarantees 100% seat integrity."*
+3. **Compound Unique Indexing**:
+   *"To guarantee structural integrity at the database engine level, I added a compound unique index on `{ showtime: 1, seatLabel: 1 }`, making it impossible for duplicate seat records to ever exist."*
 4. **Interactive Race Condition Testing**:
    *"I built an interactive test harness right into the frontend (`Simulate Race Condition`), which allows interviewers to witness conflict resolution and rollback handling live."*
 

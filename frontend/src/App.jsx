@@ -213,7 +213,7 @@ export default function App() {
 
           <div className="d-flex align-items-center gap-3">
             <span className="badge bg-success-subtle text-success border border-success-subtle small px-2 py-1 d-none d-md-inline">
-              <i className="bi bi-shield-lock-fill me-1"></i> Atomic SQLite Guard Active
+              <i className="bi bi-shield-lock-fill me-1"></i> Atomic MongoDB Atlas Guard Active
             </span>
             <button
               className="btn btn-outline-secondary btn-sm"
